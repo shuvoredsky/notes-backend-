@@ -129,11 +129,82 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
+// Scenario 1: Group users by interest using exactly ONE User.aggregate() call
+const getUsersGroupedByInterests = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+    const interest = req.query.interest ? req.query.interest.trim().toLowerCase() : null;
+
+    // The first $match uses the { interests: 1 } index when an interest filter is provided.
+    // Without the interest filter, the aggregation reads all users (full scan is inherent to grouping all users).
+    const pipeline = [];
+
+    if (interest) {
+      pipeline.push({ $match: { interests: interest } });
+    }
+
+    pipeline.push({ $unwind: '$interests' });
+
+    if (interest) {
+      pipeline.push({ $match: { interests: interest } });
+    }
+
+    pipeline.push({
+      $group: {
+        _id: '$interests',
+        count: { $sum: 1 },
+        users: {
+          $push: {
+            _id: '$_id',
+            name: '$name',
+            email: '$email'
+          }
+        }
+      }
+    });
+
+    pipeline.push({
+      $sort: { count: -1, _id: 1 }
+    });
+
+    pipeline.push({
+      $facet: {
+        data: [
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              _id: 0,
+              interest: '$_id',
+              count: 1,
+              users: 1
+            }
+          }
+        ],
+        total: [{ $count: 'count' }]
+      }
+    });
+
+    const [result] = await User.aggregate(pipeline);
+    const data = result && result.data ? result.data : [];
+    const total = result && result.total && result.total[0] ? result.total[0].count : 0;
+
+    return sendPaginated(
+      res,
+      data,
+      buildMeta(total, page, limit),
+      'Users grouped by interest retrieved successfully'
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  getUsersGroupedByInterests
 };
-

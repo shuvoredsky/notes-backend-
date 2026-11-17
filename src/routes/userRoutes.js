@@ -1,11 +1,12 @@
 const express = require('express');
-const { check, param, validationResult } = require('express-validator');
+const { check, param, query, validationResult } = require('express-validator');
 const {
   getUsers,
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  getUsersGroupedByInterests
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
@@ -57,7 +58,14 @@ const idValidation = [
   validate
 ];
 
-// Future route: GET /grouped-by-interests (Aggregation Scenario 1) - must be registered BEFORE /:id
+const groupedValidation = [
+  query('interest', 'Interest cannot be empty').optional().trim().notEmpty(),
+  validate
+];
+
+// Scenario 1: Aggregation route registered BEFORE /:id to prevent route collision
+router.get('/grouped-by-interests', groupedValidation, getUsersGroupedByInterests);
+
 // Future route: GET /:id/posts (Aggregation Scenario 2 - public route)
 
 router.get('/', getUsers);
@@ -67,4 +75,3 @@ router.put('/:id', updateValidation, updateUser);
 router.delete('/:id', idValidation, deleteUser);
 
 module.exports = router;
-

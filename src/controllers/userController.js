@@ -1,0 +1,139 @@
+const User = require('../models/User');
+const Note = require('../models/Note');
+const { getPagination, buildMeta } = require('../utils/pagination');
+const { sendSuccess, sendPaginated } = require('../utils/apiResponse');
+
+const getUsers = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+
+    const [users, total] = await Promise.all([
+      User.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+      User.countDocuments()
+    ]);
+
+    const meta = buildMeta(total, page, limit);
+
+    return sendPaginated(res, users, meta, 'Users retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserById = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return sendSuccess(res, user, 'User retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role, interests } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already registered'
+      });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'user',
+      interests
+    });
+
+    return sendSuccess(res, user, 'User created successfully', 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateUser = async (req, res, next) => {
+  try {
+    const { name, email, role, interests, password } = req.body;
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (email && email.toLowerCase().trim() !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: 'Email already registered'
+        });
+      }
+      user.email = email;
+    }
+
+    if (name !== undefined) user.name = name;
+    if (role !== undefined) user.role = role;
+    if (interests !== undefined) user.interests = interests;
+    if (password !== undefined) user.password = password;
+
+    await user.save();
+
+    return sendSuccess(res, user, 'User updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteUser = async (req, res, next) => {
+  try {
+    if (req.user._id.toString() === req.params.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await user.deleteOne();
+
+    // Cascade delete: remove user notes (uses { owner: 1, createdAt: -1 } index)
+    await Note.deleteMany({ owner: req.params.id });
+
+    // User posts will also be deleted here in the posts step
+
+    return sendSuccess(res, null, 'User and associated data deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser
+};
+

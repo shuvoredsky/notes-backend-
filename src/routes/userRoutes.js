@@ -31,9 +31,22 @@ const idValidation = [
   validate
 ];
 
+const paginationValidation = [
+  query('page', 'Page must be a positive integer').optional().isInt({ min: 1 }),
+  query('limit', 'Limit must be a positive integer').optional().isInt({ min: 1 }),
+  validate
+];
+
+const userPostsValidation = [
+  param('id').isMongoId().withMessage('Invalid user id'),
+  query('page', 'Page must be a positive integer').optional().isInt({ min: 1 }),
+  query('limit', 'Limit must be a positive integer').optional().isInt({ min: 1 }),
+  validate
+];
+
 // Scenario 2: Public route to retrieve all posts of a user via single $lookup aggregation pipeline
 // Placed BEFORE admin auth middleware so it is accessible publicly
-router.get('/:id/posts', idValidation, getUserPosts);
+router.get('/:id/posts', userPostsValidation, getUserPosts);
 
 // All subsequent user management routes require authentication and admin role
 router.use(protect, authorize('admin'));
@@ -65,13 +78,15 @@ const updateValidation = [
 
 const groupedValidation = [
   query('interest', 'Interest cannot be empty').optional().trim().notEmpty(),
+  query('page', 'Page must be a positive integer').optional().isInt({ min: 1 }),
+  query('limit', 'Limit must be a positive integer').optional().isInt({ min: 1 }),
   validate
 ];
 
 // Scenario 1: Aggregation route registered BEFORE /:id to prevent route collision
 router.get('/grouped-by-interests', groupedValidation, getUsersGroupedByInterests);
 
-router.get('/', getUsers);
+router.get('/', paginationValidation, getUsers);
 router.post('/', createValidation, createUser);
 router.get('/:id', idValidation, getUserById);
 router.put('/:id', updateValidation, updateUser);

@@ -5,10 +5,13 @@ const notFound = (req, res, next) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let statusCode = err.status || err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   let message = err.message || 'Server Error';
 
-  if (err.name === 'ValidationError') {
+  if (err.type === 'entity.too.large') {
+    statusCode = 413;
+    message = 'Payload too large';
+  } else if (err.name === 'ValidationError') {
     statusCode = 400;
     message = Object.values(err.errors)
       .map((item) => item.message)

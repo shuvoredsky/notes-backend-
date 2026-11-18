@@ -1,5 +1,5 @@
 const express = require('express');
-const { check, param, validationResult } = require('express-validator');
+const { check, param, query, validationResult } = require('express-validator');
 const {
   createNote,
   getNotes,
@@ -43,11 +43,16 @@ const idValidation = [
   validate
 ];
 
+const paginationValidation = [
+  query('page', 'Page must be a positive integer').optional().isInt({ min: 1 }),
+  query('limit', 'Limit must be a positive integer').optional().isInt({ min: 1 }),
+  validate
+];
+
 router.post('/', createValidation, createNote);
-router.get('/', getNotes);
+router.get('/', paginationValidation, getNotes);
 router.get('/:id', idValidation, getNoteById);
 router.put('/:id', updateValidation, updateNote);
 router.delete('/:id', idValidation, deleteNote);
 
 module.exports = router;
-

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Note = require('../models/Note');
+const Post = require('../models/Post');
 const { getPagination, buildMeta } = require('../utils/pagination');
 const { sendSuccess, sendPaginated } = require('../utils/apiResponse');
 
@@ -121,7 +122,8 @@ const deleteUser = async (req, res, next) => {
     // Cascade delete: remove user notes (uses { owner: 1, createdAt: -1 } index)
     await Note.deleteMany({ owner: req.params.id });
 
-    // User posts will also be deleted here in the posts step
+    // Cascade delete: remove user posts (uses { author: 1, createdAt: -1 } index)
+    await Post.deleteMany({ author: req.params.id });
 
     return sendSuccess(res, null, 'User and associated data deleted successfully');
   } catch (error) {

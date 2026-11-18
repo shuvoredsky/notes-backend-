@@ -8,13 +8,11 @@ const {
   deleteUser,
   getUsersGroupedByInterests
 } = require('../controllers/userController');
+const { getUserPosts } = require('../controllers/postController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
-
-// All user management routes require authentication and admin role
-router.use(protect, authorize('admin'));
 
 const validate = (req, res, next) => {
   const errors = validationResult(req);
@@ -27,6 +25,18 @@ const validate = (req, res, next) => {
   }
   next();
 };
+
+const idValidation = [
+  param('id').isMongoId().withMessage('Invalid user id'),
+  validate
+];
+
+// Scenario 2: Public route to retrieve all posts of a user via single $lookup aggregation pipeline
+// Placed BEFORE admin auth middleware so it is accessible publicly
+router.get('/:id/posts', idValidation, getUserPosts);
+
+// All subsequent user management routes require authentication and admin role
+router.use(protect, authorize('admin'));
 
 const createValidation = [
   check('name', 'Name is required').trim().notEmpty(),
@@ -53,11 +63,6 @@ const updateValidation = [
   validate
 ];
 
-const idValidation = [
-  param('id').isMongoId().withMessage('Invalid user id'),
-  validate
-];
-
 const groupedValidation = [
   query('interest', 'Interest cannot be empty').optional().trim().notEmpty(),
   validate
@@ -65,8 +70,6 @@ const groupedValidation = [
 
 // Scenario 1: Aggregation route registered BEFORE /:id to prevent route collision
 router.get('/grouped-by-interests', groupedValidation, getUsersGroupedByInterests);
-
-// Future route: GET /:id/posts (Aggregation Scenario 2 - public route)
 
 router.get('/', getUsers);
 router.post('/', createValidation, createUser);
